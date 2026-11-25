@@ -3,8 +3,8 @@
  */
 
 window.FLARE_FILES = {
-  MAX_DIMENSION: 1600,
-  JPEG_QUALITY: 0.78,
+  MAX_DIMENSION: 1280,
+  JPEG_QUALITY: 0.72,
 
   /**
    * Compresses an image File to max 1600px longest side JPEG base64.

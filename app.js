@@ -66,6 +66,11 @@
     el._timer = setTimeout(() => el.classList.add('hidden'), ms);
   }
 
+  /** Drive thumbnails: ask for a 400px image in grids; the full size is only loaded when a photo is opened. */
+  function smallThumb(url) {
+    return String(url || '').replace(/([?&]sz=w)\d+/, '$1' + '400');
+  }
+
   function statusClass(status) {
     return 'badge-' + String(status || '').toLowerCase().replace(/\s+/g, '-');
   }
@@ -205,21 +210,50 @@
   // --- Data Loaders ---
   async function loadLoginUsers() {
     if (!API.isConfigured()) return;
+    const cachedUsers = API.cacheGet('loginUsers');
+    if (cachedUsers && cachedUsers.length && !state.loginUsers.length) {
+      state.loginUsers = cachedUsers;
+      render();
+    }
     try {
       const data = await API.call('loginUsers', {});
       state.loginUsers = data.users || [];
+      API.cacheSet('loginUsers', state.loginUsers);
     } catch (e) {
       showToast(I18N.formatError(e.message));
     }
   }
 
-  async function refreshRequests() {
+  function hasActiveFilters() {
+    return Object.keys(state.filters).some((k) => state.filters[k]);
+  }
+
+  function applyListData(data) {
+    state.requests = data.requests || [];
+    state.actionRequiredCount = data.actionRequiredCount || 0;
+    state.meta = data.meta || { branches: [], categories: [], technicians: [] };
+  }
+
+  /** Show the last known list straight away (from this device) while the fresh one loads. */
+  function hydrateRequestsFromCache() {
+    if (!state.session || state.requests.length) return;
+    const cached = API.cacheGet('list_' + state.session.userId);
+    if (cached) applyListData(cached);
+  }
+
+  async function refreshRequests(opts) {
     if (!state.session) return;
+    const filtered = state.route === 'requests' && hasActiveFilters();
+    // Moving between tabs within 20 seconds: reuse what we already have instead of asking the server again.
+    if (opts && opts.soft && !filtered && !state.listIsFiltered && state.listFetchedAt && Date.now() - state.listFetchedAt < 20000) return;
     try {
-      const data = await API.call('listRequests', { filters: state.route === 'requests' ? state.filters : {} });
-      state.requests = data.requests || [];
-      state.actionRequiredCount = data.actionRequiredCount || 0;
-      state.meta = data.meta || { branches: [], categories: [], technicians: [] };
+      const data = await API.call('listRequests', { filters: filtered ? state.filters : {} });
+      applyListData(data);
+      state.listIsFiltered = filtered;
+      if (!filtered) {
+        state.listFetchedAt = Date.now();
+        API.cacheSet('list_' + state.session.userId, { requests: state.requests.slice(0, 150), actionRequiredCount: state.actionRequiredCount, meta: state.meta });
+      }
       renderChrome();
     } catch (e) {
       if (e.message === 'UNAUTHORIZED' || e.message === 'SESSION_EXPIRED') {
@@ -230,9 +264,17 @@
     }
   }
 
+  const detailCache = {};
+
   async function loadDetail(requestId) {
+    if (detailCache[requestId]) {
+      state.currentDetail = detailCache[requestId];
+      render();
+    }
     try {
       const data = await API.call('getRequestDetail', { requestId });
+      detailCache[requestId] = data;
+      if (state.route !== 'detail' || state.selectedRequestId !== requestId) return;
       state.currentDetail = data;
       render();
     } catch (e) {
@@ -262,8 +304,9 @@
     }
     if (route === 'home' || route === 'requests') {
       window.location.hash = '#/' + route;
+      hydrateRequestsFromCache();
       render();
-      refreshRequests().then(render);
+      refreshRequests({ soft: true }).then(render);
       return;
     }
     render();
@@ -363,6 +406,8 @@
       state.session = data.session;
       API.setSession(data.session);
       state.pinBuffer = '';
+      state.requests = [];
+      state.listFetchedAt = 0;
       if (data.session.preferredLang) {
         I18N.setLanguage(data.session.preferredLang);
       }
@@ -633,6 +678,7 @@
             base64Data: p.base64Data
           }))
         });
+        state.listFetchedAt = 0;
         showToast(I18N.t('requestSent') + ' ' + res.requestId, 4000);
         navigate('detail', { requestId: res.requestId });
       } catch (e) {
@@ -725,6 +771,8 @@
     try {
       const updated = await API.call('transitionRequest', Object.assign({ requestId: state.selectedRequestId }, payload));
       state.currentDetail = updated;
+      if (updated && updated.request) detailCache[updated.request.requestId] = updated;
+      state.listFetchedAt = 0;
       closeModal();
       showToast(I18N.t('actionDone'));
       render();
@@ -857,7 +905,7 @@
         <div class="photo-grid">
           ${(req.beforePhotos || []).map((p) => `
             <div class="photo-thumb-wrap">
-              <img src="${esc(p.thumbUrl || p.viewUrl)}" referrerpolicy="no-referrer" data-lightbox="${esc(p.thumbUrl || p.viewUrl)}" alt="before" />
+              <img src="${esc(smallThumb(p.thumbUrl || p.viewUrl))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-lightbox="${esc(p.thumbUrl || p.viewUrl)}" alt="before" />
             </div>
           `).join('')}
         </div>
@@ -929,7 +977,7 @@
           <div class="photo-grid">
             ${req.afterPhotos.map((p) => `
               <div class="photo-thumb-wrap">
-                <img src="${esc(p.thumbUrl || p.viewUrl)}" referrerpolicy="no-referrer" data-lightbox="${esc(p.thumbUrl || p.viewUrl)}" alt="after" />
+                <img src="${esc(smallThumb(p.thumbUrl || p.viewUrl))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-lightbox="${esc(p.thumbUrl || p.viewUrl)}" alt="after" />
               </div>
             `).join('')}
           </div>
@@ -1243,6 +1291,7 @@
     API.clearSession();
     state.session = null;
     state.requests = [];
+    state.listFetchedAt = 0;
     state.currentDetail = null;
     loadLoginUsers().then(render);
   };
@@ -1282,6 +1331,8 @@
           return;
         }
       }
+      hydrateRequestsFromCache();
+      render();
       await refreshRequests();
       render();
     }
