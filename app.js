@@ -504,6 +504,9 @@
       const myAction = all.filter((r) => r.needsMyAction);
       listToShow = state.homeTab === 'inbox' ? myAction : all;
       tabsHtml = `
+        <button id="btn-home-new" class="btn btn-outline btn-block" style="margin-bottom:12px;">
+          ${esc(I18N.t('newRequestBtn'))}
+        </button>
         <div class="tabs">
           <button class="tab-btn ${state.homeTab === 'inbox' ? 'active' : ''}" data-tab="inbox">${esc(I18N.t('myTasksTab'))} (${myAction.length})</button>
           <button class="tab-btn ${state.homeTab === 'all' ? 'active' : ''}" data-tab="all">${esc(I18N.t('allRequestsTab'))} (${all.length})</button>
