@@ -393,9 +393,14 @@
             </div>
             <div class="resp-box">
               <div class="muted-sm" style="margin-bottom:4px;">${esc(I18N.t('responsiblesTitle'))} (${b.responsibles.length})</div>
-              ${b.responsibles.length ? b.responsibles.map((r) => `<span class="badge badge-in-progress" style="margin:2px;">${esc(userName(r.userId))} · ${esc(I18N.tMap('jobTitles', r.jobTitle))}</span>`).join('')
-                : `<span class="muted-sm">${esc(I18N.t('noResponsibles'))}</span>`}
-              <div><button class="btn btn-navy btn-sm" style="margin-top:8px;" data-resp-branch="${esc(b.branchId)}" type="button">${esc(I18N.t('manageResponsibles'))}</button></div>
+              ${b.responsibles.length ? b.responsibles.map((r) => `
+                <div class="person-row">
+                  <div><strong>${esc(userName(r.userId))}</strong> <span class="badge badge-in-progress">${esc(I18N.tMap('jobTitles', r.jobTitle))}</span></div>
+                  <button class="btn btn-outline btn-sm" data-remove-person="${esc(b.branchId)}|${esc(r.userId)}" type="button" title="${esc(I18N.t('removeFromBranch'))}">✕</button>
+                </div>`).join('')
+                : `<div class="muted-sm">${esc(I18N.t('branchPeopleNone'))}</div>`}
+              <button class="btn btn-primary btn-sm btn-block" style="margin-top:10px;" data-add-person="${esc(b.branchId)}" type="button">${esc(I18N.t('addBranchPerson'))}</button>
+              <button class="btn btn-outline btn-sm btn-block" style="margin-top:6px;" data-resp-branch="${esc(b.branchId)}" type="button">${esc(I18N.t('manageResponsibles'))}</button>
             </div>
           </div>`).join('');
     } else {
@@ -423,6 +428,15 @@
     root().querySelectorAll('[data-edit-user]').forEach((b) => { b.onclick = () => openUserForm(a.users.find((u) => u.userId === b.dataset.editUser)); });
     root().querySelectorAll('[data-edit-branch]').forEach((b) => { b.onclick = () => openBranchForm(a.branches.find((x) => x.branchId === b.dataset.editBranch)); });
     root().querySelectorAll('[data-resp-branch]').forEach((b) => { b.onclick = () => openResponsiblesForm(a.branches.find((x) => x.branchId === b.dataset.respBranch)); });
+    root().querySelectorAll('[data-add-person]').forEach((b) => { b.onclick = () => openBranchPersonForm(a.branches.find((x) => x.branchId === b.dataset.addPerson)); });
+    root().querySelectorAll('[data-remove-person]').forEach((b) => {
+      b.onclick = () => {
+        const [branchId, userId] = b.dataset.removePerson.split('|');
+        const br = a.branches.find((x) => x.branchId === branchId);
+        if (!window.confirm(I18N.t('removeFromBranch') + ': ' + userName(userId) + ' ؟')) return;
+        submitAdmin('adminSetBranchResponsibles', { branchId, responsibles: br.responsibles.filter((r) => r.userId !== userId) });
+      };
+    });
     root().querySelectorAll('[data-edit-cat]').forEach((b) => { b.onclick = () => openCategoryForm(a.categories.find((x) => x.categoryId === b.dataset.editCat)); });
   }
 
@@ -531,6 +545,48 @@
         }
       });
       submitAdmin('adminSetBranchResponsibles', { branchId: b.branchId, responsibles: list });
+    };
+  }
+
+  /** Add a new manager / assistant manager (or coach / supervisor) straight into one branch. */
+  function openBranchPersonForm(b) {
+    const a = ext.admin;
+    APP.openModal(`
+      <h3 class="card-title">${esc(I18N.t('addBranchPersonTitle'))} ${esc(nm(b, 'name'))}</h3>
+      ${field('p-nameAr', I18N.t('nameAr'), '', 'dir="rtl"')}
+      ${field('p-nameEn', I18N.t('nameEn'), '', 'dir="ltr"')}
+      <div class="form-group"><label class="form-label" for="p-jobTitle">${esc(I18N.t('jobTitleLabel'))}</label>
+        <select id="p-jobTitle" class="form-control">${a.jobTitles.map((j) => `<option value="${esc(j)}">${esc(I18N.tMap('jobTitles', j))}</option>`).join('')}</select></div>
+      ${field('p-phone', I18N.t('phoneLabel'), '', 'type="tel" dir="ltr" autocomplete="off"')}
+      ${field('p-email', I18N.t('emailLabel'), '', 'type="email" dir="ltr" autocomplete="off"')}
+      ${field('p-pin', I18N.t('pinRequiredNew'), '', 'type="password" inputmode="numeric" maxlength="8" autocomplete="new-password" dir="ltr"')}
+      <div class="muted-sm" style="margin:-6px 0 10px;">${esc(I18N.t('pinHint'))}</div>
+      ${formButtons()}
+    `);
+    document.getElementById('frm-cancel').onclick = APP.closeModal;
+    document.getElementById('frm-save').onclick = async () => {
+      const pin = val('p-pin');
+      if (!val('p-nameAr') || !val('p-nameEn')) { APP.showToast(I18N.formatError('NAME_REQUIRED')); return; }
+      if (!/^\d{4,8}$/.test(pin)) { APP.showToast(I18N.formatError('PIN_INVALID_FORMAT')); return; }
+      const btn = document.getElementById('frm-save');
+      btn.disabled = true;
+      try {
+        const jobTitle = val('p-jobTitle');
+        const created = await API.call('adminSaveUser', {
+          nameAr: val('p-nameAr'), nameEn: val('p-nameEn'), role: 'Branch Responsible', jobTitle,
+          phone: val('p-phone'), email: val('p-email'), isActive: true, pin
+        });
+        await API.call('adminSetBranchResponsibles', {
+          branchId: b.branchId,
+          responsibles: b.responsibles.concat([{ userId: created.userId, jobTitle }])
+        });
+        APP.closeModal();
+        APP.showToast(I18N.t('saved'));
+        await loadAdmin();
+      } catch (e) {
+        APP.showToast(I18N.formatError(e.message), 4500);
+        btn.disabled = false;
+      }
     };
   }
 

@@ -139,6 +139,11 @@ window.FLARE_I18N = {
       emailFailed: 'الإيميل ما اتبعتش، جرّب تاني.',
       repHint: 'ملف Excel فيه شيت عربي وشيت إنجليزي. للـ PDF اختار لغة التقرير واضغط "اطبع" وبعدين "حفظ كـ PDF".',
       excelFallback: 'مفيش نت لمكتبة Excel، نزّلناه CSV بيفتح في Excel.',
+      addBranchPerson: '+ ضيف مدير / مساعد مدير للفرع ده',
+      addBranchPersonTitle: 'مسؤول جديد لفرع',
+      branchPeopleNone: 'لسه مفيش مدير للفرع ده',
+      removeFromBranch: 'شيله من الفرع',
+      pinRequiredNew: 'PIN (من 4 لـ 8 أرقام)',
       admUsers: 'الناس',
       admBranches: 'الفروع',
       admCategories: 'التصنيفات',
@@ -208,6 +213,7 @@ window.FLARE_I18N = {
       },
       jobTitles: {
         'Branch Manager': 'مدير فرع',
+        'Assistant Manager': 'مساعد مدير',
         'Coach': 'كوتش',
         'Supervisor': 'مشرف'
       },
@@ -376,6 +382,11 @@ window.FLARE_I18N = {
       emailFailed: 'Email could not be sent. Try again.',
       repHint: 'The Excel file has an Arabic sheet and an English sheet. For PDF, pick the report language, press Print, then "Save as PDF".',
       excelFallback: 'Excel library unavailable offline — downloaded as CSV instead.',
+      addBranchPerson: '+ Add manager / assistant manager to this branch',
+      addBranchPersonTitle: 'New responsible for branch',
+      branchPeopleNone: 'No manager for this branch yet',
+      removeFromBranch: 'Remove from branch',
+      pinRequiredNew: 'PIN (4 to 8 digits)',
       admUsers: 'Users',
       admBranches: 'Branches',
       admCategories: 'Categories',
@@ -445,6 +456,7 @@ window.FLARE_I18N = {
       },
       jobTitles: {
         'Branch Manager': 'Branch Manager',
+        'Assistant Manager': 'Assistant Manager',
         'Coach': 'Coach',
         'Supervisor': 'Supervisor'
       },
