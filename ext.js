@@ -483,7 +483,21 @@
       <div class="muted-sm" style="margin:-6px 0 10px;">${esc(I18N.t('pinHint'))}</div>
       <label class="check-row"><input id="u-active" type="checkbox" ${cur.isActive ? 'checked' : ''} /> ${esc(I18N.t('active'))}</label>
       ${formButtons()}
+      ${u && u.userId !== (APP.state.session || {}).userId ? `<button id="frm-delete" class="btn btn-danger btn-block" style="margin-top:10px;" type="button">${esc(I18N.t('deleteUser'))}</button>` : ''}
     `);
+    const delBtn = document.getElementById('frm-delete');
+    if (delBtn) {
+      delBtn.onclick = () => {
+        // two-step confirm inside the form: first tap arms, second tap deletes
+        if (delBtn.dataset.armed !== '1') {
+          delBtn.dataset.armed = '1';
+          delBtn.textContent = I18N.t('deleteUserConfirm') + ' ' + I18N.localizedName(u);
+          return;
+        }
+        delBtn.disabled = true;
+        submitAdmin('adminDeleteUser', { userId: u.userId }).then(() => { delBtn.disabled = false; });
+      };
+    }
     const syncJt = () => { document.getElementById('u-jt-wrap').style.display = val('u-role') === 'Branch Responsible' ? '' : 'none'; };
     document.getElementById('u-role').onchange = syncJt;
     syncJt();

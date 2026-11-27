@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flare-cmms-v7-pages';
+const CACHE_NAME = 'flare-cmms-v8-pages';
 const SHELL_ASSETS = [
   './',
   './index.html',
